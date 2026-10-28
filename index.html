@@ -89,6 +89,7 @@ button {
   border: 1px solid var(--rule); background: var(--panel); color: var(--ink); cursor: pointer;
 }
 button.primary { background: var(--edit); color: #1a1200; border-color: var(--edit); }
+button:disabled { opacity: .6; cursor: progress; }
 button.danger { color: #b3261e; }
 button:focus-visible, input:focus-visible { outline: 3px solid var(--edit); outline-offset: 2px; }
 
@@ -166,8 +167,8 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--edit); outl
   <div class="editor-head">
     <h2>Edit schedule</h2>
     <div class="btns">
-      <button id="saveBtn" type="button">Save to file</button>
-      <button class="primary" id="doneBtn" type="button">Done</button>
+      <button class="primary" id="publishBtn" type="button">Publish to TV</button>
+      <button id="doneBtn" type="button">Close</button>
     </div>
   </div>
   <div class="editor-body" id="editorBody"></div>
@@ -273,7 +274,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--edit); outl
     body.innerHTML = "";
 
     var sb = el("div", { "class": "savebox" });
-    sb.appendChild(el("p", null, "Changes show on screen straight away and are kept in this browser. To update the TV, click “Save to file”, save over index.html in your flight-board folder, then drag that folder onto your Netlify site’s Deploys page. The TV picks up the new schedule within 10 minutes."));
+    sb.appendChild(el("p", null, "Change the times below, then click “Publish to TV”. The TV shows the new schedule within about 5 minutes."));
     body.appendChild(sb);
 
     var gen = el("fieldset");
@@ -334,6 +335,84 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--edit); outl
     });
     foot.appendChild(add); foot.appendChild(reset);
     body.appendChild(foot);
+
+    var cfg = loadCfg();
+    var set = el("fieldset");
+    set.style.marginTop = "28px";
+    set.appendChild(el("legend", null, "Publishing setup (admin only)"));
+    set.appendChild(el("p", { "class": "tip" }, "Done once per computer. Staff don’t need to change anything here."));
+    set.appendChild(textField("GitHub username", cfg.owner, function (v) { cfg.owner = v.trim(); saveCfg(cfg); }));
+    set.appendChild(textField("Repository name", cfg.repo, function (v) { cfg.repo = v.trim(); saveCfg(cfg); }));
+    var tid = "tok" + Math.random().toString(36).slice(2, 6);
+    set.appendChild(el("label", { "for": tid }, "Access token"));
+    var tok = el("input", { type: "password", id: tid, autocomplete: "off", placeholder: cfg.token ? "Saved (hidden)" : "Paste token here" });
+    tok.addEventListener("change", function () { if (tok.value.trim()) { cfg.token = tok.value.trim(); saveCfg(cfg); tok.value = ""; tok.placeholder = "Saved (hidden)"; toast("Token saved on this computer."); } });
+    tok.style.width = "100%"; tok.style.font = "inherit"; tok.style.fontSize = "16px"; tok.style.padding = "9px 10px";
+    tok.style.borderRadius = "6px"; tok.style.border = "1px solid var(--rule)"; tok.style.background = "var(--field)"; tok.style.color = "var(--ink)";
+    set.appendChild(tok);
+    set.appendChild(el("p", { "class": "tip" }, "The token is stored only in this browser on this computer."));
+    var sacts = el("div", { "class": "row-actions" });
+    var test = el("button", { type: "button" }, "Test connection");
+    test.addEventListener("click", function () {
+      ghGet(loadCfg()).then(function () { toast("Connected. Publishing is ready."); })
+        .catch(function (e) { toast(e.message); });
+    });
+    var clr = el("button", { type: "button", "class": "danger" }, "Remove token");
+    clr.addEventListener("click", function () { var c = loadCfg(); c.token = ""; saveCfg(c); renderEditor(); toast("Token removed from this computer."); });
+    var bk = el("button", { type: "button" }, "Save backup file");
+    bk.addEventListener("click", saveFile);
+    sacts.appendChild(test); sacts.appendChild(clr); sacts.appendChild(bk);
+    set.appendChild(sacts);
+    body.appendChild(set);
+  }
+
+  /* ---------- Publishing to GitHub ---------- */
+  var CFG_KEY = "lre-flight-board-publish";
+  function loadCfg() {
+    var d = { owner: "JHU-QAL", repo: "lre-flights", token: "" };
+    try { var raw = localStorage.getItem(CFG_KEY); if (raw) { var c = JSON.parse(raw); for (var k in c) d[k] = c[k]; } } catch (e) {}
+    return d;
+  }
+  function saveCfg(c) { try { localStorage.setItem(CFG_KEY, JSON.stringify(c)); } catch (e) {} }
+  function apiUrl(c) { return "https://api.github.com/repos/" + encodeURIComponent(c.owner) + "/" + encodeURIComponent(c.repo) + "/contents/index.html"; }
+  function ghHeaders(c) { return { "Authorization": "Bearer " + c.token, "Accept": "application/vnd.github+json" }; }
+  function ghGet(c) {
+    if (!c.token) return Promise.reject(new Error("This computer isn’t set up to publish yet. Ask your admin."));
+    return fetch(apiUrl(c), { headers: ghHeaders(c), cache: "no-store" }).then(function (r) {
+      if (r.status === 401) throw new Error("The access token isn’t valid or has expired. Ask your admin.");
+      if (r.status === 403 || r.status === 404) throw new Error("Can’t reach the board on GitHub. Ask your admin to check the setup.");
+      if (!r.ok) throw new Error("GitHub error (" + r.status + "). Please try again.");
+      return r.json();
+    }, function () { throw new Error("No internet connection. Please try again."); });
+  }
+  function b64(str) {
+    var bytes = new TextEncoder().encode(str), bin = "";
+    for (var i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+    return btoa(bin);
+  }
+  var publishing = false;
+  function publish() {
+    if (publishing) return;
+    var bad = editor.querySelectorAll("input.bad");
+    if (bad.length) { toast("Please fix the times marked in red first."); bad[0].focus(); return; }
+    var c = loadCfg(), btn = document.getElementById("publishBtn");
+    publishing = true; btn.textContent = "Publishing…"; btn.disabled = true;
+    ghGet(c).then(function (cur) {
+      return fetch(apiUrl(c), {
+        method: "PUT",
+        headers: ghHeaders(c),
+        body: JSON.stringify({ message: "Update flight schedule", content: b64(buildHtml()), sha: cur.sha })
+      }).then(function (r) {
+        if (!r.ok) throw new Error("Couldn’t publish (" + r.status + "). Please try again.");
+      });
+    }).then(function () {
+      FILE_DATA = clone(state);
+      toast("Published. The TV will update within about 5 minutes.");
+    }).catch(function (e) {
+      toast(e.message);
+    }).then(function () {
+      publishing = false; btn.textContent = "Publish to TV"; btn.disabled = false;
+    });
   }
 
   function update() { state.updated = Date.now(); saveLocal(); renderBoard(); }
@@ -347,7 +426,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--edit); outl
   function toast(msg) {
     var t = document.getElementById("toast");
     t.textContent = msg; t.classList.add("show");
-    clearTimeout(toast._t); toast._t = setTimeout(function () { t.classList.remove("show"); }, 4000);
+    clearTimeout(toast._t); toast._t = setTimeout(function () { t.classList.remove("show"); }, 6000);
   }
   function saveFile() {
     var html = buildHtml();
@@ -361,7 +440,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--edit); outl
         });
       }).then(function () {
         FILE_DATA = clone(state);
-        toast("Saved. Now upload the folder to Netlify to update the TV.");
+        toast("Backup saved.");
       }).catch(function (e) {
         if (e && e.name === "AbortError") return;
         downloadFallback(html);
@@ -394,7 +473,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--edit); outl
   }
   document.getElementById("editBtn").addEventListener("click", function () { openEditor(!editor.classList.contains("open")); });
   document.getElementById("doneBtn").addEventListener("click", function () { openEditor(false); });
-  document.getElementById("saveBtn").addEventListener("click", saveFile);
+  document.getElementById("publishBtn").addEventListener("click", publish);
   document.getElementById("themeBtn").addEventListener("click", function () {
     var isDark = state.theme ? state.theme === "dark" : window.matchMedia("(prefers-color-scheme: dark)").matches;
     state.theme = isDark ? "light" : "dark"; update();
@@ -432,7 +511,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--edit); outl
     if (d !== lastDay) { lastDay = d; renderBoard(); }
   }
 
-  // When hosted online, check for a newer schedule every 10 minutes.
+  // When hosted online, check for a newer schedule every 2 minutes.
   // If the internet is down, the board keeps showing what it has.
   function checkForUpdate() {
     if (!/^https?:/.test(location.protocol)) return;
@@ -450,7 +529,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--edit); outl
       })
       .catch(function () {});
   }
-  setInterval(checkForUpdate, 10 * 60 * 1000);
+  setInterval(checkForUpdate, 2 * 60 * 1000);
   setTimeout(checkForUpdate, 5000);
 
   renderBoard();
