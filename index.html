@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Longreach Departures</title>
+<style>
+:root {
+  --bg: #f4f1ee; --panel: #ffffff; --row: #f7f4f2; --row-alt: #f3e8e3;
+  --ink: #1e1210; --muted: #7a6660; --accent: #3b160d; --accent-ink: #ffffff;
+  --today: #c8551f; --today-ink: #ffffff; --rule: #e2d6d0; --edit: #f5a524; --field: #ffffff;
+  color-scheme: light;
+  box-sizing: border-box;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #140b08; --panel: #1f1310; --row: #221613; --row-alt: #2b1b17;
+    --ink: #f8f1ee; --muted: #b39d95; --accent: #5a2516; --accent-ink: #ffffff;
+    --today: #e0682c; --today-ink: #ffffff; --rule: #3a2621; --edit: #ffb84d; --field: #2a1a16;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #140b08; --panel: #1f1310; --row: #221613; --row-alt: #2b1b17;
+  --ink: #f8f1ee; --muted: #b39d95; --accent: #5a2516; --accent-ink: #ffffff;
+  --today: #e0682c; --today-ink: #ffffff; --rule: #3a2621; --edit: #ffb84d; --field: #2a1a16;
+  color-scheme: dark;
+}
+*, *::before, *::after { box-sizing: inherit; }
+html { height: 100%; }
+body {
+  height: 100%; margin: 0;
+  background: var(--bg); color: var(--ink);
+  font-family: "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  overflow: hidden;
+}
+.board { height: 100%; display: grid; grid-template-rows: auto 1fr auto; padding: 3.5vh 4vw; gap: 2.6vh; }
+header {
+  display: flex; justify-content: space-between; align-items: flex-end; gap: 3vw;
+  border-bottom: 0.5vh solid var(--accent); padding-bottom: 1.6vh;
+}
+#title { font-size: clamp(26px, 4.4vw, 124px); font-weight: 700; line-height: 1.05; margin: 0; }
+.clock { text-align: right; white-space: nowrap; }
+#time { font-size: clamp(24px, 3.8vw, 104px); font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
+#date { font-size: clamp(14px, 1.5vw, 42px); color: var(--muted); margin-top: 0.6vh; }
+
+#routes { display: grid; grid-template-columns: repeat(var(--cols, 1), minmax(0, 1fr)); gap: 2.2vw; min-height: 0; }
+.route {
+  container-type: inline-size; min-height: 0;
+  display: flex; flex-direction: column;
+  border-radius: 1vw; overflow: hidden; border: 1px solid var(--rule); background: var(--panel);
+}
+.route h2 { margin: 0; padding: 1.4vh 3.5cqw 0.4vh; font-size: clamp(18px, 5cqw, 72px); font-weight: 700; }
+.route table { width: 100%; flex: 1; border-collapse: collapse; table-layout: fixed; }
+.route thead th {
+  background: var(--accent); color: var(--accent-ink); text-align: left; font-weight: 700;
+  font-size: clamp(13px, 3.6cqw, 52px); padding: 1.4vh 3.5cqw;
+}
+.route thead th:first-child { width: 30%; }
+.route tbody td { font-size: clamp(15px, 5cqw, 72px); padding: 0 3.5cqw; font-variant-numeric: tabular-nums; border-top: 1px solid var(--rule); }
+.route tbody tr:nth-child(odd) td { background: var(--row); }
+.route tbody tr:nth-child(even) td { background: var(--row-alt); }
+.route tbody tr.none td:not(:first-child) { color: var(--muted); }
+.route tbody tr.none td.nf { font-size: clamp(12px, 3.4cqw, 48px); }
+.route tbody tr.today td { background: var(--today); color: var(--today-ink); font-weight: 700; }
+.route tbody tr.today td:first-child::after {
+  content: "Today"; display: inline-block; margin-left: 2cqw; font-size: 0.45em; vertical-align: middle;
+  padding: 0.25em 0.6em; border: 2px solid currentColor; border-radius: 999px;
+}
+.strip {
+  display: flex; align-items: center; gap: 2vw;
+  background: var(--accent); color: var(--accent-ink); border-radius: 1vw; padding: 1.8vh 2vw;
+}
+#headline { font-size: clamp(18px, 2.2vw, 62px); font-weight: 700; margin: 0; white-space: nowrap; }
+#message { font-size: clamp(14px, 1.6vw, 46px); margin: 0; line-height: 1.3; flex: 1; }
+#updated { font-size: clamp(11px, 1vw, 30px); opacity: .75; white-space: nowrap; margin: 0; }
+#message:empty, #headline:empty { display: none; }
+
+.controls {
+  position: fixed; right: 16px; bottom: 0; padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  display: flex; gap: 8px; transition: opacity .3s; z-index: 20;
+}
+.controls.hidden { opacity: 0; pointer-events: none; }
+button {
+  font: 700 15px/1 "Segoe UI", Roboto, Arial, sans-serif;
+  padding: 10px 14px; border-radius: 8px;
+  border: 1px solid var(--rule); background: var(--panel); color: var(--ink); cursor: pointer;
+}
+button.primary { background: var(--edit); color: #1a1200; border-color: var(--edit); }
+button.danger { color: #b3261e; }
+button:focus-visible, input:focus-visible { outline: 3px solid var(--edit); outline-offset: 2px; }
+
+.editor {
+  position: fixed; top: 0; right: 0; bottom: 0; width: min(560px, 100%);
+  background: var(--panel); color: var(--ink); border-left: 1px solid var(--rule);
+  box-shadow: -8px 0 30px rgba(0,0,0,.25);
+  transform: translateX(100%); transition: transform .25s ease;
+  z-index: 30; display: flex; flex-direction: column;
+}
+.editor.open { transform: none; }
+.editor-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 16px 20px; border-bottom: 1px solid var(--rule); }
+.editor-head h2 { margin: 0; font-size: 20px; }
+.editor-head .btns { display: flex; gap: 8px; }
+.editor-body { overflow-y: auto; padding: 16px 20px 32px; flex: 1; font-size: 15px; }
+.editor fieldset { border: 1px solid var(--rule); border-radius: 10px; padding: 14px 16px 16px; margin: 0 0 18px; }
+.editor legend { font-weight: 700; font-size: 16px; padding: 0 6px; }
+.editor label { display: block; font-weight: 700; margin: 10px 0 4px; }
+.editor input[type="text"] {
+  width: 100%; font: inherit; font-size: 16px; padding: 9px 10px; border-radius: 6px;
+  border: 1px solid var(--rule); background: var(--field); color: var(--ink);
+}
+.editor .tip { color: var(--muted); font-size: 13.5px; margin: 6px 0 0; line-height: 1.4; }
+.times { width: 100%; border-collapse: collapse; margin-top: 10px; }
+.times th { text-align: left; font-size: 13.5px; color: var(--muted); padding: 4px 6px; }
+.times td { padding: 4px 6px; }
+.times td:first-child { font-weight: 700; width: 60px; }
+.times input[type="text"] { padding: 7px 8px; font-variant-numeric: tabular-nums; }
+.times input.bad { border-color: #b3261e; }
+.row-actions, .editor-foot { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+.savebox { border: 2px solid var(--edit); border-radius: 10px; padding: 14px 16px; margin: 0 0 18px; }
+.savebox p { margin: 0 0 10px; line-height: 1.4; }
+
+.toast {
+  position: fixed; left: 50%; top: 24px; transform: translateX(-50%);
+  background: var(--accent); color: var(--accent-ink);
+  padding: 12px 18px; border-radius: 8px; font-size: 16px; font-weight: 700;
+  z-index: 40; display: none; box-shadow: 0 6px 20px rgba(0,0,0,.25);
+}
+.toast.show { display: block; }
+
+@media (max-width: 760px) {
+  body { overflow: auto; }
+  .board { height: auto; min-height: 100%; }
+  #routes { grid-template-columns: 1fr; }
+  header { flex-direction: column; align-items: flex-start; }
+  .clock { text-align: left; }
+  .route tbody td { padding: 1.2vh 3.5cqw; }
+  .strip { flex-direction: column; align-items: flex-start; }
+}
+@media (prefers-reduced-motion: reduce) { .controls, .editor { transition: none; } }
+</style>
+</head>
+<body>
+<div class="board">
+  <header>
+    <h1 id="title"></h1>
+    <div class="clock"><div id="time">--:--</div><div id="date"></div></div>
+  </header>
+  <main id="routes"></main>
+  <div class="strip">
+    <p id="headline"></p>
+    <p id="message"></p>
+    <p id="updated"></p>
+  </div>
+</div>
+
+<div class="controls" id="controls">
+  <button class="primary" id="editBtn" type="button">Edit schedule</button>
+  <button id="themeBtn" type="button">Theme</button>
+  <button id="fsBtn" type="button">Full screen</button>
+</div>
+
+<aside class="editor" id="editor" aria-label="Edit schedule" aria-hidden="true">
+  <div class="editor-head">
+    <h2>Edit schedule</h2>
+    <div class="btns">
+      <button id="saveBtn" type="button">Save to file</button>
+      <button class="primary" id="doneBtn" type="button">Done</button>
+    </div>
+  </div>
+  <div class="editor-body" id="editorBody"></div>
+</aside>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<!-- SCHEDULE DATA: edited by the "Save to file" button. -->
+<script id="board-data" type="application/json">
+{"updated":0,"title":"Longreach Departures","headline":"Welcome","message":"Please check in at least 45 minutes before departure. All times are local.","theme":"","routes":[{"name":"Longreach to Brisbane","code":"LRE > BNE","depLabel":"Departs Longreach","arrLabel":"Arrives Brisbane","times":[["14:50","16:55"],["14:50","16:55"],["14:50","16:55"],["14:35","16:40"],["14:50","16:55"],["12:50","14:55"],["16:20","18:25"]]},{"name":"Longreach to Townsville","code":"LRE > TSV","depLabel":"Departs Longreach","arrLabel":"Arrives Townsville","times":[["",""],["14:45","17:10"],["",""],["14:45","17:10"],["",""],["",""],["",""]]}]}
+</script>
+
+<script>
+(function () {
+  // Snapshot of this file as loaded, used to write an updated copy.
+  var PRISTINE = "<!DOCTYPE html>\n" + document.documentElement.outerHTML;
+  var KEY = "lre-flight-board";
+  var DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  var FILE_DATA = JSON.parse(document.getElementById("board-data").textContent);
+  var state;
+
+  function clone(o) { return JSON.parse(JSON.stringify(o)); }
+  function loadLocal() {
+    try { var raw = localStorage.getItem(KEY); var d = raw ? JSON.parse(raw) : null; return (d && Array.isArray(d.routes)) ? d : null; }
+    catch (e) { return null; }
+  }
+  function saveLocal() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} }
+
+  // Use whichever copy is newer: the one inside this file, or edits saved in this browser.
+  var local = loadLocal();
+  if (local && (local.updated || 0) > (FILE_DATA.updated || 0)) { state = local; }
+  else { state = clone(FILE_DATA); saveLocal(); }
+
+  function todayIdx() { return (new Date().getDay() + 6) % 7; }
+  function el(tag, attrs, text) {
+    var e = document.createElement(tag);
+    if (attrs) for (var k in attrs) e.setAttribute(k, attrs[k]);
+    if (text != null) e.textContent = text;
+    return e;
+  }
+  function fmtUpdated(ts) {
+    if (!ts) return "";
+    var d = new Date(ts);
+    return "Updated " + d.toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "numeric" });
+  }
+
+  function renderBoard() {
+    document.getElementById("title").textContent = state.title;
+    document.getElementById("headline").textContent = state.headline;
+    document.getElementById("message").textContent = state.message;
+    document.getElementById("updated").textContent = fmtUpdated(state.updated);
+    if (state.theme) document.documentElement.setAttribute("data-theme", state.theme);
+    else document.documentElement.removeAttribute("data-theme");
+
+    var wrap = document.getElementById("routes");
+    wrap.innerHTML = "";
+    wrap.style.setProperty("--cols", Math.max(1, Math.min(state.routes.length, 3)));
+    var t = todayIdx();
+    state.routes.forEach(function (r) {
+      var sec = el("section", { "class": "route" });
+      sec.appendChild(el("h2", null, r.name));
+      var table = el("table"), thead = el("thead"), hr = el("tr");
+      hr.appendChild(el("th", null, r.code));
+      hr.appendChild(el("th", null, r.depLabel));
+      hr.appendChild(el("th", null, r.arrLabel));
+      thead.appendChild(hr); table.appendChild(thead);
+      var tb = el("tbody");
+      DAYS.forEach(function (d, i) {
+        var dep = ((r.times[i] && r.times[i][0]) || "").trim();
+        var arr = ((r.times[i] && r.times[i][1]) || "").trim();
+        var tr = el("tr");
+        if (i === t) tr.className = "today";
+        tr.appendChild(el("td", null, d));
+        if (!dep && !arr) {
+          tr.classList.add("none");
+          tr.appendChild(el("td", { "class": "nf" }, "No flight"));
+          tr.appendChild(el("td", { "class": "nf" }, "—"));
+        } else {
+          tr.appendChild(el("td", null, dep || "—"));
+          tr.appendChild(el("td", null, arr || "—"));
+        }
+        tb.appendChild(tr);
+      });
+      table.appendChild(tb); sec.appendChild(table); wrap.appendChild(sec);
+    });
+  }
+
+  function textField(labelText, value, onInput, tip) {
+    var frag = document.createDocumentFragment();
+    var id = "f" + Math.random().toString(36).slice(2, 8);
+    frag.appendChild(el("label", { "for": id }, labelText));
+    var inp = el("input", { type: "text", id: id });
+    inp.value = value;
+    inp.addEventListener("input", function () { onInput(inp.value); update(); });
+    frag.appendChild(inp);
+    if (tip) frag.appendChild(el("p", { "class": "tip" }, tip));
+    return frag;
+  }
+  function validTime(v) { return v === "" || /^([01]?\d|2[0-3]):[0-5]\d$/.test(v.trim()); }
+
+  function renderEditor() {
+    var body = document.getElementById("editorBody");
+    body.innerHTML = "";
+
+    var sb = el("div", { "class": "savebox" });
+    sb.appendChild(el("p", null, "Changes show on screen straight away and are kept in this browser. To update the TV, click “Save to file”, save over index.html in your flight-board folder, then drag that folder onto your Netlify site’s Deploys page. The TV picks up the new schedule within 10 minutes."));
+    body.appendChild(sb);
+
+    var gen = el("fieldset");
+    gen.appendChild(el("legend", null, "Screen text"));
+    gen.appendChild(textField("Page title", state.title, function (v) { state.title = v; }));
+    gen.appendChild(textField("Message heading", state.headline, function (v) { state.headline = v; }));
+    gen.appendChild(textField("Message", state.message, function (v) { state.message = v; }, "Shown in the bar at the bottom of the screen. Leave blank to hide."));
+    body.appendChild(gen);
+
+    state.routes.forEach(function (r, ri) {
+      var fs = el("fieldset");
+      fs.appendChild(el("legend", null, r.name || ("Route " + (ri + 1))));
+      fs.appendChild(textField("Route name", r.name, function (v) { r.name = v; fs.querySelector("legend").textContent = v || ("Route " + (ri + 1)); }));
+      fs.appendChild(textField("Route code", r.code, function (v) { r.code = v; }, "For example LRE > TSV"));
+      fs.appendChild(textField("Arrival column heading", r.arrLabel, function (v) { r.arrLabel = v; }));
+      var tbl = el("table", { "class": "times" }), h = el("tr");
+      h.appendChild(el("th", null, "Day")); h.appendChild(el("th", null, "Departs")); h.appendChild(el("th", null, "Arrives"));
+      tbl.appendChild(h);
+      DAYS.forEach(function (d, i) {
+        var tr = el("tr");
+        tr.appendChild(el("td", null, d));
+        [0, 1].forEach(function (c) {
+          var td = el("td");
+          var inp = el("input", { type: "text", inputmode: "numeric", placeholder: "--:--", "aria-label": d + (c ? " arrives" : " departs") });
+          inp.value = (r.times[i] && r.times[i][c]) || "";
+          inp.addEventListener("input", function () {
+            if (!r.times[i]) r.times[i] = ["", ""];
+            r.times[i][c] = inp.value.trim();
+            inp.classList.toggle("bad", !validTime(inp.value));
+            update();
+          });
+          td.appendChild(inp); tr.appendChild(td);
+        });
+        tbl.appendChild(tr);
+      });
+      fs.appendChild(tbl);
+      fs.appendChild(el("p", { "class": "tip" }, "Type times as 24-hour, like 14:45. Leave both boxes blank on days with no flight."));
+      var acts = el("div", { "class": "row-actions" });
+      var del = el("button", { type: "button", "class": "danger" }, "Remove this route");
+      del.addEventListener("click", function () {
+        if (!confirm("Remove “" + (r.name || "this route") + "” from the screen?")) return;
+        state.routes.splice(ri, 1); update(); renderEditor();
+      });
+      acts.appendChild(del); fs.appendChild(acts);
+      body.appendChild(fs);
+    });
+
+    var foot = el("div", { "class": "editor-foot" });
+    var add = el("button", { type: "button" }, "+ Add another route");
+    add.addEventListener("click", function () {
+      state.routes.push({ name: "Longreach to …", code: "LRE > ", depLabel: "Departs Longreach", arrLabel: "Arrives …", times: DAYS.map(function () { return ["", ""]; }) });
+      update(); renderEditor(); body.scrollTop = body.scrollHeight;
+    });
+    var reset = el("button", { type: "button", "class": "danger" }, "Undo unsaved changes");
+    reset.addEventListener("click", function () {
+      if (!confirm("Go back to the schedule stored in this file? Changes not saved to the file will be lost.")) return;
+      state = clone(FILE_DATA); saveLocal(); renderBoard(); renderEditor();
+    });
+    foot.appendChild(add); foot.appendChild(reset);
+    body.appendChild(foot);
+  }
+
+  function update() { state.updated = Date.now(); saveLocal(); renderBoard(); }
+
+  // Build a copy of this file with the current schedule written inside it.
+  function buildHtml() {
+    var json = JSON.stringify(state).replace(/</g, "\\u003c");
+    var re = /(<script id="board-data" type="application\/json">)[\s\S]*?(<\/script>)/;
+    return PRISTINE.replace(re, function (m, a, b) { return a + "\n" + json + "\n" + b; });
+  }
+  function toast(msg) {
+    var t = document.getElementById("toast");
+    t.textContent = msg; t.classList.add("show");
+    clearTimeout(toast._t); toast._t = setTimeout(function () { t.classList.remove("show"); }, 4000);
+  }
+  function saveFile() {
+    var html = buildHtml();
+    if (window.showSaveFilePicker) {
+      window.showSaveFilePicker({
+        suggestedName: "index.html",
+        types: [{ description: "Web page", accept: { "text/html": [".html"] } }]
+      }).then(function (handle) {
+        return handle.createWritable().then(function (w) {
+          return w.write(html).then(function () { return w.close(); });
+        });
+      }).then(function () {
+        FILE_DATA = clone(state);
+        toast("Saved. Now upload the folder to Netlify to update the TV.");
+      }).catch(function (e) {
+        if (e && e.name === "AbortError") return;
+        downloadFallback(html);
+      });
+    } else {
+      downloadFallback(html);
+    }
+  }
+  function downloadFallback(html) {
+    try {
+      var blob = new Blob([html], { type: "text/html" });
+      var a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "index.html";
+      document.body.appendChild(a); a.click();
+      setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+      FILE_DATA = clone(state);
+      toast("Saved to your Downloads folder as index.html.");
+    } catch (e) {
+      toast("Couldn’t save the file on this device.");
+    }
+  }
+
+  var editor = document.getElementById("editor");
+  function openEditor(on) {
+    editor.classList.toggle("open", on);
+    editor.setAttribute("aria-hidden", on ? "false" : "true");
+    if (on) { renderEditor(); setTimeout(function () { var f = editor.querySelector("input"); if (f) f.focus(); }, 50); }
+    showControls();
+  }
+  document.getElementById("editBtn").addEventListener("click", function () { openEditor(!editor.classList.contains("open")); });
+  document.getElementById("doneBtn").addEventListener("click", function () { openEditor(false); });
+  document.getElementById("saveBtn").addEventListener("click", saveFile);
+  document.getElementById("themeBtn").addEventListener("click", function () {
+    var isDark = state.theme ? state.theme === "dark" : window.matchMedia("(prefers-color-scheme: dark)").matches;
+    state.theme = isDark ? "light" : "dark"; update();
+  });
+  function toggleFs() {
+    try { if (!document.fullscreenElement) document.documentElement.requestFullscreen(); else document.exitFullscreen(); } catch (e) {}
+  }
+  document.getElementById("fsBtn").addEventListener("click", toggleFs);
+  document.addEventListener("keydown", function (e) {
+    if (e.target.tagName === "INPUT") { if (e.key === "Escape") openEditor(false); return; }
+    if (e.key === "e" || e.key === "E") openEditor(!editor.classList.contains("open"));
+    if (e.key === "f" || e.key === "F") toggleFs();
+    if (e.key === "Escape") openEditor(false);
+  });
+
+  var controls = document.getElementById("controls"), idleTimer;
+  function showControls() {
+    controls.classList.remove("hidden");
+    document.body.style.cursor = "";
+    clearTimeout(idleTimer);
+    if (!editor.classList.contains("open")) {
+      idleTimer = setTimeout(function () { controls.classList.add("hidden"); document.body.style.cursor = "none"; }, 3000);
+    }
+  }
+  ["mousemove", "mousedown", "touchstart", "keydown"].forEach(function (ev) {
+    document.addEventListener(ev, showControls, { passive: true });
+  });
+
+  var timeEl = document.getElementById("time"), dateEl = document.getElementById("date"), lastDay = "";
+  function tick() {
+    var now = new Date();
+    timeEl.textContent = now.toLocaleTimeString("en-AU", { hour: "2-digit", minute: "2-digit", hour12: false });
+    var d = now.toLocaleDateString("en-AU", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+    dateEl.textContent = d;
+    if (d !== lastDay) { lastDay = d; renderBoard(); }
+  }
+
+  // When hosted online, check for a newer schedule every 10 minutes.
+  // If the internet is down, the board keeps showing what it has.
+  function checkForUpdate() {
+    if (!/^https?:/.test(location.protocol)) return;
+    if (editor.classList.contains("open")) return;
+    fetch(location.pathname + "?v=" + Date.now(), { cache: "no-store" })
+      .then(function (r) { return r.ok ? r.text() : null; })
+      .then(function (txt) {
+        if (!txt) return;
+        var m = txt.match(/<script id="board-data" type="application\/json">([\s\S]*?)<\/script>/);
+        if (!m) return;
+        var data = JSON.parse(m[1]);
+        if (data && Array.isArray(data.routes) && (data.updated || 0) > (state.updated || 0)) {
+          state = data; FILE_DATA = clone(data); saveLocal(); renderBoard();
+        }
+      })
+      .catch(function () {});
+  }
+  setInterval(checkForUpdate, 10 * 60 * 1000);
+  setTimeout(checkForUpdate, 5000);
+
+  renderBoard();
+  tick();
+  setInterval(tick, 1000);
+  showControls();
+})();
+</script>
+</body>
+</html>
