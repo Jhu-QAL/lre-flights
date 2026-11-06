@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Longreach Airport – Departures</title>
+<style>
+:root {
+  /* Longreach Airport brand: red PMS 202, orange PMS 166, taupe PMS 410 */
+  --brand-red: #8a191d; --brand-orange: #e73221; --brand-taupe: #9f8373;
+  --bg: #f6f3f1; --panel: #ffffff; --row: #fbf9f8; --row-alt: #f3ece8;
+  --ink: #1d1414; --muted: #7d6a60; --accent: var(--brand-red); --accent-ink: #ffffff;
+  --today: var(--brand-orange); --today-ink: #ffffff; --rule: #e6ddd7; --edit: #f5a524; --field: #ffffff;
+  --head: var(--brand-orange); --strip: var(--brand-taupe); --today-bg: #fde3db; --today-text: var(--brand-red); --today-muted: #b0675a;
+  --logo-word: var(--brand-red); --logo-sub: var(--brand-taupe); --logo-swoosh: var(--brand-orange);
+  color-scheme: light;
+  box-sizing: border-box;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #120a0a; --panel: #1c1212; --row: #201515; --row-alt: #2a1b1a;
+    --ink: #f7f1ef; --muted: #b8a49a; --accent: var(--brand-red); --accent-ink: #ffffff;
+    --today: var(--brand-orange); --today-ink: #ffffff; --rule: #3a2826; --edit: #ffb84d; --field: #2a1a18;
+    --head: var(--brand-orange); --strip: var(--brand-taupe); --today-bg: #4a1f19; --today-text: #ffffff; --today-muted: #f3c9bd;
+    --logo-word: #ffffff; --logo-sub: var(--brand-taupe); --logo-swoosh: var(--brand-orange);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #120a0a; --panel: #1c1212; --row: #201515; --row-alt: #2a1b1a;
+  --ink: #f7f1ef; --muted: #b8a49a; --accent: var(--brand-red); --accent-ink: #ffffff;
+  --today: var(--brand-orange); --today-ink: #ffffff; --rule: #3a2826; --edit: #ffb84d; --field: #2a1a18;
+  --head: var(--brand-orange); --strip: var(--brand-taupe); --today-bg: #4a1f19; --today-text: #ffffff; --today-muted: #f3c9bd;
+  --logo-word: #ffffff; --logo-sub: var(--brand-taupe); --logo-swoosh: var(--brand-orange);
+  color-scheme: dark;
+}
+*, *::before, *::after { box-sizing: inherit; }
+html { height: 100%; }
+body {
+  height: 100%; margin: 0;
+  background: var(--bg); color: var(--ink);
+  font-family: "Helvetica Neue", Helvetica, Calibri, "Segoe UI", Roboto, Arial, sans-serif;
+  overflow: hidden;
+}
+.board { height: 100%; display: grid; grid-template-rows: auto 1fr auto; padding: 3vh 4vw 4.2vh; gap: 2.4vh; }
+header {
+  display: flex; justify-content: space-between; align-items: center; gap: 3vw;
+  border-bottom: 0.5vh solid var(--brand-orange); padding-bottom: 1.6vh;
+}
+#title { font-size: clamp(24px, 3.8vw, 108px); font-weight: 300; line-height: 1.05; margin: 0; color: var(--ink); letter-spacing: 0.01em; }
+.brand { display: flex; align-items: center; gap: 2.4vw; min-width: 0; }
+.logo { height: clamp(44px, 9vh, 200px); width: auto; flex: none; display: block; }
+.lg-word { fill: var(--logo-word); } .lg-sub { fill: var(--logo-sub); } .lg-swoosh { fill: var(--logo-swoosh); }
+.brand-divider { width: 2px; align-self: stretch; background: var(--rule); flex: none; }
+.base-graphic { position: fixed; left: 0; right: 0; bottom: 0; height: calc(1.2vh + env(safe-area-inset-bottom, 0px)); background: var(--brand-orange); z-index: 5; }
+.clock { text-align: right; white-space: nowrap; }
+#time { font-size: clamp(24px, 3.8vw, 104px); font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
+#date { font-size: clamp(14px, 1.5vw, 42px); color: var(--muted); margin-top: 0.6vh; }
+
+#routes { display: grid; grid-template-columns: repeat(var(--cols, 1), minmax(0, 1fr)); gap: 2.2vw; min-height: 0; }
+.route {
+  container-type: inline-size; min-height: 0;
+  display: flex; flex-direction: column;
+  border-radius: 1vw; overflow: hidden; border: 1px solid var(--rule); background: var(--panel);
+}
+.route h2 { color: var(--logo-word); margin: 0; padding: 1.4vh 3.5cqw 0.4vh; font-size: clamp(18px, 5cqw, 72px); font-weight: 700; }
+.route table { width: 100%; flex: 1; border-collapse: collapse; table-layout: fixed; }
+.route thead th {
+  background: var(--head); color: #ffffff; text-align: left; font-weight: 700;
+  font-size: clamp(13px, 3.6cqw, 52px); padding: 1.4vh 3.5cqw;
+}
+.route thead th:first-child { width: 30%; }
+.route tbody td { font-size: clamp(15px, 5cqw, 72px); padding: 0 3.5cqw; font-variant-numeric: tabular-nums; border-top: 1px solid var(--rule); }
+.route tbody tr:nth-child(odd) td { background: var(--row); }
+.route tbody tr:nth-child(even) td { background: var(--row-alt); }
+.route tbody tr.none td:not(:first-child) { color: var(--muted); }
+.route tbody tr.none td.nf { font-size: clamp(12px, 3.4cqw, 48px); }
+.route tbody tr.today td { background: var(--today-bg); color: var(--today-text); font-weight: 700; }
+.route tbody tr.today td:first-child { box-shadow: inset 1.2cqw 0 0 var(--brand-orange); }
+.route tbody tr.today.none td:not(:first-child) { color: var(--today-muted); font-weight: 400; }
+.route tbody tr.today td:first-child::after {
+  content: "Today"; display: inline-block; margin-left: 2cqw; font-size: 0.45em; vertical-align: middle;
+  padding: 0.3em 0.7em; background: var(--brand-orange); color: #ffffff; border-radius: 999px;
+}
+.strip {
+  display: flex; align-items: center; gap: 2vw;
+  background: var(--strip); color: #ffffff; border-radius: 1vw; padding: 1.8vh 2vw;
+}
+#headline { font-size: clamp(18px, 2.2vw, 62px); font-weight: 700; margin: 0; white-space: nowrap; }
+#message { font-size: clamp(14px, 1.6vw, 46px); margin: 0; line-height: 1.3; flex: 1; }
+#updated { font-size: clamp(11px, 1vw, 30px); opacity: .75; white-space: nowrap; margin: 0; }
+#message:empty, #headline:empty { display: none; }
+
+.controls {
+  position: fixed; right: 16px; bottom: 0; padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+  display: flex; gap: 8px; transition: opacity .3s; z-index: 20;
+}
+.controls.hidden { opacity: 0; pointer-events: none; }
+button {
+  font: 700 15px/1 "Segoe UI", Roboto, Arial, sans-serif;
+  padding: 10px 14px; border-radius: 8px;
+  border: 1px solid var(--rule); background: var(--panel); color: var(--ink); cursor: pointer;
+}
+button.primary { background: var(--edit); color: #1a1200; border-color: var(--edit); }
+button:disabled { opacity: .6; cursor: progress; }
+button.danger { color: #b3261e; }
+button:focus-visible, input:focus-visible { outline: 3px solid var(--edit); outline-offset: 2px; }
+
+.editor {
+  position: fixed; top: 0; right: 0; bottom: 0; width: min(560px, 100%);
+  background: var(--panel); color: var(--ink); border-left: 1px solid var(--rule);
+  box-shadow: -8px 0 30px rgba(0,0,0,.25);
+  transform: translateX(100%); transition: transform .25s ease;
+  z-index: 30; display: flex; flex-direction: column;
+}
+.editor.open { transform: none; }
+.editor-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 16px 20px; border-bottom: 1px solid var(--rule); }
+.editor-head h2 { margin: 0; font-size: 20px; }
+.editor-head .btns { display: flex; gap: 8px; }
+.editor-body { overflow-y: auto; padding: 16px 20px 32px; flex: 1; font-size: 15px; }
+.editor fieldset { border: 1px solid var(--rule); border-radius: 10px; padding: 14px 16px 16px; margin: 0 0 18px; }
+.editor legend { font-weight: 700; font-size: 16px; padding: 0 6px; }
+.editor label { display: block; font-weight: 700; margin: 10px 0 4px; }
+.editor input[type="text"] {
+  width: 100%; font: inherit; font-size: 16px; padding: 9px 10px; border-radius: 6px;
+  border: 1px solid var(--rule); background: var(--field); color: var(--ink);
+}
+.editor .tip { color: var(--muted); font-size: 13.5px; margin: 6px 0 0; line-height: 1.4; }
+.times { width: 100%; border-collapse: collapse; margin-top: 10px; }
+.times th { text-align: left; font-size: 13.5px; color: var(--muted); padding: 4px 6px; }
+.times td { padding: 4px 6px; }
+.times td:first-child { font-weight: 700; width: 60px; }
+.times input[type="text"] { padding: 7px 8px; font-variant-numeric: tabular-nums; }
+.times input.bad { border-color: #b3261e; }
+.row-actions, .editor-foot { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+.savebox { border: 2px solid var(--edit); border-radius: 10px; padding: 14px 16px; margin: 0 0 18px; }
+.savebox p { margin: 0 0 10px; line-height: 1.4; }
+
+.toast {
+  position: fixed; left: 50%; top: 24px; transform: translateX(-50%);
+  background: var(--accent); color: var(--accent-ink);
+  padding: 12px 18px; border-radius: 8px; font-size: 16px; font-weight: 700;
+  z-index: 40; display: none; box-shadow: 0 6px 20px rgba(0,0,0,.25);
+}
+.toast.show { display: block; }
+
+@media (max-width: 760px) {
+  body { overflow: auto; }
+  .board { height: auto; min-height: 100%; }
+  #routes { grid-template-columns: 1fr; }
+  header { flex-direction: column; align-items: flex-start; }
+  .clock { text-align: left; }
+  .route tbody td { padding: 1.2vh 3.5cqw; }
+  .strip { flex-direction: column; align-items: flex-start; }
+}
+@media (prefers-reduced-motion: reduce) { .controls, .editor { transition: none; } }
+</style>
+</head>
+<body>
+<div class="board">
+  <header>
+    <div class="brand">
+      <svg class="logo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 981.095 354.201" role="img" aria-label="Longreach Airport"><defs><clipPath id="lgclip-0"><path clip-rule="nonzero" d="M 0.652344 0 L 316 0 L 316 353.34375 L 0.652344 353.34375 Z M 0.652344 0 "/></clipPath><clipPath id="lgclip-1"><path clip-rule="nonzero" d="M 901 125 L 979.539062 125 L 979.539062 247 L 901 247 Z M 901 125 "/></clipPath></defs><path fill-rule="nonzero" class="lg-sub" fill-opacity="1" d="M 544.539062 278.371094 L 524.90625 278.371094 L 524.90625 271.777344 L 572.039062 271.777344 L 572.039062 278.371094 L 552.394531 278.371094 L 552.394531 330.722656 L 544.539062 330.722656 L 544.539062 278.371094 "/><g clip-path="url(#lgclip-0)"><path fill-rule="nonzero" class="lg-swoosh" fill-opacity="1" d="M 315.9375 0 C 244.648438 24.792969 90.625 168.332031 24.5625 269.324219 C -38.003906 364.996094 24.890625 365.925781 181.988281 336.210938 C -76.449219 369.007812 200.777344 65.234375 315.9375 0 "/></g><path fill-rule="nonzero" class="lg-word" fill-opacity="1" d="M 338.277344 231.289062 C 352.753906 231.289062 355.136719 218.855469 355.136719 186.148438 C 355.136719 153.445312 352.753906 141 338.277344 141 C 323.796875 141 321.414062 153.613281 321.414062 186.148438 C 321.414062 218.847656 323.796875 231.289062 338.277344 231.289062 M 338.277344 122.941406 C 375.074219 122.941406 379.671875 149.171875 379.671875 186.148438 C 379.671875 223.125 375.074219 249.347656 338.277344 249.347656 C 301.480469 249.347656 296.878906 223.105469 296.878906 186.148438 C 296.878906 149.195312 301.480469 122.941406 338.277344 122.941406 "/><path fill-rule="nonzero" class="lg-word" fill-opacity="1" d="M 415.621094 125.328125 L 445.265625 208.628906 L 445.613281 208.628906 L 445.613281 125.328125 L 468.09375 125.328125 L 468.09375 246.964844 L 440.15625 246.964844 L 410.171875 161.773438 L 409.824219 161.773438 L 409.824219 246.964844 L 387.34375 246.964844 L 387.34375 125.328125 L 415.621094 125.328125 "/><path fill-rule="nonzero" class="lg-word" fill-opacity="1" d="M 532.328125 161.445312 C 532.328125 152.40625 528.238281 141 518.351562 141 C 506.4375 141 501.65625 153.265625 501.65625 183.597656 C 501.65625 213.925781 504.382812 231.289062 518.53125 231.289062 C 524.316406 231.289062 533.695312 224.984375 533.695312 211.863281 L 533.695312 199.441406 L 517.511719 199.441406 L 517.511719 181.378906 L 557.203125 181.378906 L 557.203125 246.972656 L 539.152344 246.972656 L 539.152344 235.71875 L 538.8125 235.71875 C 533.027344 245.265625 524.664062 249.359375 513.261719 249.359375 C 483.097656 249.359375 477.144531 226.859375 477.144531 184.78125 C 477.144531 142.707031 486.679688 122.953125 518.039062 122.953125 C 544.949219 122.953125 555.855469 136.75 555.855469 161.457031 L 532.347656 161.457031 "/><path fill-rule="nonzero" class="lg-word" fill-opacity="1" d="M 590.765625 178.46875 L 600.984375 178.46875 C 612.746094 178.46875 619.390625 173.347656 619.390625 160.238281 C 619.390625 149.003906 613.425781 143.386719 602.359375 143.386719 L 590.765625 143.386719 L 590.765625 178.46875 M 566.230469 125.316406 L 611.550781 125.316406 C 631.652344 125.316406 643.90625 135.882812 643.90625 156.667969 C 643.90625 172.851562 637.441406 183.753906 623.640625 186.660156 L 623.640625 187 C 640.332031 189.222656 642.898438 198.402344 643.238281 224.132812 C 643.40625 236.914062 644.097656 243.550781 648.6875 245.933594 L 648.6875 246.964844 L 622.105469 246.964844 C 619.722656 243.550781 619.210938 238.949219 619.042969 234.191406 L 618.363281 210.835938 C 618.023438 201.304688 613.765625 195.507812 603.886719 195.507812 L 590.765625 195.507812 L 590.765625 246.964844 L 566.230469 246.964844 L 566.230469 125.316406 "/><path fill-rule="nonzero" class="lg-word" fill-opacity="1" d="M 722.109375 125.328125 L 722.109375 145.421875 L 678.6875 145.421875 L 678.6875 174.046875 L 719.566406 174.046875 L 719.566406 194.152344 L 678.6875 194.152344 L 678.6875 226.859375 L 723.828125 226.859375 L 723.828125 246.964844 L 654.144531 246.964844 L 654.144531 125.328125 L 722.109375 125.328125 "/><path fill-rule="nonzero" class="lg-word" fill-opacity="1" d="M 756.191406 201.125 L 780.039062 201.125 L 768.285156 146.441406 L 767.945312 146.441406 L 756.203125 201.125 Z M 752.960938 125.328125 L 783.273438 125.328125 L 815.480469 246.964844 L 789.925781 246.964844 L 784.300781 221.222656 L 751.933594 221.222656 L 746.304688 246.964844 L 720.753906 246.964844 L 752.949219 125.328125 L 752.960938 125.328125 "/><path fill-rule="nonzero" class="lg-word" fill-opacity="1" d="M 869.160156 166.382812 C 869.160156 148.664062 865.578125 141 854.5 141 C 842.070312 141 839.167969 153.445312 839.167969 187.847656 C 839.167969 224.664062 844.285156 231.296875 854.839844 231.296875 C 863.691406 231.296875 870.167969 226.699219 870.167969 200.457031 L 894.699219 200.457031 C 894.699219 226.707031 888.226562 249.347656 856.039062 249.347656 C 819.242188 249.347656 814.652344 223.117188 814.652344 186.148438 C 814.652344 149.183594 819.25 122.953125 856.039062 122.953125 C 892.824219 122.953125 893.691406 148.683594 893.691406 166.394531 L 869.167969 166.394531 L 869.160156 166.382812 "/><g clip-path="url(#lgclip-1)"><path fill-rule="nonzero" class="lg-word" fill-opacity="1" d="M 901.863281 125.328125 L 926.398438 125.328125 L 926.398438 171.832031 L 955.015625 171.832031 L 955.015625 125.328125 L 979.539062 125.328125 L 979.539062 246.964844 L 955.015625 246.964844 L 955.015625 192.953125 L 926.398438 192.953125 L 926.398438 246.964844 L 901.863281 246.964844 L 901.863281 125.328125 "/></g><path fill-rule="nonzero" class="lg-sub" fill-opacity="1" d="M 248.390625 306.367188 L 268.363281 306.367188 L 258.546875 278.890625 L 258.375 278.890625 Z M 254.253906 271.765625 L 262.925781 271.765625 L 285.953125 330.722656 L 277.285156 330.722656 L 270.847656 312.972656 L 245.914062 312.972656 L 239.308594 330.722656 L 231.21875 330.722656 L 254.253906 271.765625 "/><path fill-rule="nonzero" class="lg-sub" fill-opacity="1" d="M 290.425781 330.722656 L 298.277344 330.722656 L 298.277344 271.777344 L 290.425781 271.777344 Z M 290.425781 330.722656 "/><path fill-rule="nonzero" class="lg-sub" fill-opacity="1" d="M 334.035156 298.9375 C 341.378906 298.9375 347.664062 297.03125 347.664062 288.449219 C 347.664062 282.671875 344.523438 278.382812 337.179688 278.382812 L 317.691406 278.382812 L 317.691406 298.9375 Z M 309.839844 271.777344 L 337.578125 271.777344 C 348.644531 271.777344 355.496094 277.792969 355.496094 287.210938 C 355.496094 294.304688 352.363281 300.171875 345.261719 302.148438 L 345.261719 302.316406 C 352.113281 303.636719 353.511719 308.664062 354.089844 314.441406 C 354.589844 320.21875 354.25 326.664062 357.550781 330.703125 L 348.800781 330.703125 C 346.566406 328.308594 347.816406 321.953125 346.65625 316.167969 C 345.828125 310.398438 344.421875 305.519531 336.828125 305.519531 L 317.671875 305.519531 L 317.671875 330.703125 L 309.839844 330.703125 L 309.839844 271.765625 L 309.839844 271.777344 "/><path fill-rule="nonzero" class="lg-sub" fill-opacity="1" d="M 372.597656 300.011719 L 387.953125 300.011719 C 396.785156 300.101562 400.835938 296.210938 400.835938 289.199219 C 400.835938 282.183594 396.785156 278.371094 387.953125 278.371094 L 372.597656 278.371094 L 372.597656 300.011719 M 364.757812 271.777344 L 390.597656 271.777344 C 402.320312 271.777344 408.6875 278.292969 408.6875 289.199219 C 408.6875 300.101562 402.332031 306.6875 390.597656 306.617188 L 372.597656 306.617188 L 372.597656 330.734375 L 364.757812 330.734375 L 364.757812 271.777344 "/><path fill-rule="nonzero" class="lg-sub" fill-opacity="1" d="M 441.554688 325.515625 C 455.921875 325.515625 461.945312 313.132812 461.945312 301.25 C 461.945312 289.367188 455.921875 276.976562 441.554688 276.976562 C 427.183594 276.976562 421.160156 289.367188 421.160156 301.25 C 421.160156 313.132812 427.195312 325.515625 441.554688 325.515625 M 441.554688 270.359375 C 460.300781 270.359375 469.789062 285.214844 469.789062 301.242188 C 469.789062 317.265625 460.300781 332.121094 441.554688 332.121094 C 422.804688 332.121094 413.316406 317.253906 413.316406 301.242188 C 413.316406 285.226562 422.804688 270.359375 441.554688 270.359375 "/><path fill-rule="nonzero" class="lg-sub" fill-opacity="1" d="M 501.9375 298.925781 C 509.277344 298.925781 515.566406 297.019531 515.566406 288.4375 C 515.566406 282.664062 512.421875 278.371094 505.070312 278.371094 L 485.574219 278.371094 L 485.574219 298.925781 Z M 477.742188 271.777344 L 505.488281 271.777344 C 516.554688 271.777344 523.398438 277.792969 523.398438 287.210938 C 523.398438 294.304688 520.265625 300.171875 513.160156 302.148438 L 513.160156 302.316406 C 520.015625 303.636719 521.421875 308.664062 522 314.441406 C 522.5 320.21875 522.152344 326.664062 525.472656 330.703125 L 516.703125 330.703125 C 514.480469 328.308594 515.714844 321.953125 514.558594 316.167969 C 513.730469 310.398438 512.332031 305.519531 504.730469 305.519531 L 485.574219 305.519531 L 485.574219 330.703125 L 477.742188 330.703125 L 477.742188 271.765625 "/><path fill-rule="nonzero" class="lg-word" fill-opacity="1" d="M 227.367188 246.964844 L 227.367188 125.328125 L 251.890625 125.328125 L 251.890625 226.859375 L 295.34375 226.859375 L 295.34375 246.964844 L 227.367188 246.964844 "/></svg>
+      <span class="brand-divider" aria-hidden="true"></span>
+      <h1 id="title"></h1>
+    </div>
+    <div class="clock"><div id="time">--:--</div><div id="date"></div></div>
+  </header>
+  <main id="routes"></main>
+  <div class="strip">
+    <p id="headline"></p>
+    <p id="message"></p>
+    <p id="updated"></p>
+  </div>
+</div>
+
+<div class="base-graphic" aria-hidden="true"></div>
+
+<div class="controls" id="controls">
+  <button class="primary" id="editBtn" type="button">Edit schedule</button>
+  <button id="themeBtn" type="button">Theme</button>
+  <button id="fsBtn" type="button">Full screen</button>
+</div>
+
+<aside class="editor" id="editor" aria-label="Edit schedule" aria-hidden="true">
+  <div class="editor-head">
+    <h2>Edit schedule</h2>
+    <div class="btns">
+      <button class="primary" id="publishBtn" type="button">Publish to TV</button>
+      <button id="doneBtn" type="button">Close</button>
+    </div>
+  </div>
+  <div class="editor-body" id="editorBody"></div>
+</aside>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<!-- SCHEDULE DATA: edited by the "Save to file" button. -->
+<script id="board-data" type="application/json">
+{"updated":0,"title":"Departures","headline":"Welcome","message":"Please check in at least 45 minutes before departure. All times are local.","theme":"","routes":[{"name":"Longreach to Brisbane","code":"LRE > BNE","depLabel":"Departs Longreach","arrLabel":"Arrives Brisbane","times":[["14:50","16:55"],["14:50","16:55"],["14:50","16:55"],["14:35","16:40"],["14:50","16:55"],["12:50","14:55"],["16:20","18:25"]]},{"name":"Longreach to Townsville","code":"LRE > TSV","depLabel":"Departs Longreach","arrLabel":"Arrives Townsville","times":[["",""],["14:45","17:10"],["",""],["14:45","17:10"],["",""],["",""],["",""]]}]}
+</script>
+
+<script>
+(function () {
+  // Snapshot of this file as loaded, used to write an updated copy.
+  var PRISTINE = "<!DOCTYPE html>\n" + document.documentElement.outerHTML;
+  var KEY = "lre-flight-board";
+  var DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  var FILE_DATA = JSON.parse(document.getElementById("board-data").textContent);
+  var state;
+
+  function clone(o) { return JSON.parse(JSON.stringify(o)); }
+  function loadLocal() {
+    try { var raw = localStorage.getItem(KEY); var d = raw ? JSON.parse(raw) : null; return (d && Array.isArray(d.routes)) ? d : null; }
+    catch (e) { return null; }
+  }
+  function saveLocal() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} }
+
+  // Use whichever copy is newer: the one inside this file, or edits saved in this browser.
+  var local = loadLocal();
+  if (local && (local.updated || 0) > (FILE_DATA.updated || 0)) { state = local; }
+  else { state = clone(FILE_DATA); saveLocal(); }
+
+  function todayIdx() { return (new Date().getDay() + 6) % 7; }
+  function el(tag, attrs, text) {
+    var e = document.createElement(tag);
+    if (attrs) for (var k in attrs) e.setAttribute(k, attrs[k]);
+    if (text != null) e.textContent = text;
+    return e;
+  }
+  function fmtUpdated(ts) {
+    if (!ts) return "";
+    var d = new Date(ts);
+    return "Updated " + d.toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "numeric" });
+  }
+
+  function renderBoard() {
+    document.getElementById("title").textContent = state.title;
+    document.getElementById("headline").textContent = state.headline;
+    document.getElementById("message").textContent = state.message;
+    document.getElementById("updated").textContent = fmtUpdated(state.updated);
+    if (state.theme) document.documentElement.setAttribute("data-theme", state.theme);
+    else document.documentElement.removeAttribute("data-theme");
+
+    var wrap = document.getElementById("routes");
+    wrap.innerHTML = "";
+    wrap.style.setProperty("--cols", Math.max(1, Math.min(state.routes.length, 3)));
+    var t = todayIdx();
+    state.routes.forEach(function (r) {
+      var sec = el("section", { "class": "route" });
+      sec.appendChild(el("h2", null, r.name));
+      var table = el("table"), thead = el("thead"), hr = el("tr");
+      hr.appendChild(el("th", null, r.code));
+      hr.appendChild(el("th", null, r.depLabel));
+      hr.appendChild(el("th", null, r.arrLabel));
+      thead.appendChild(hr); table.appendChild(thead);
+      var tb = el("tbody");
+      DAYS.forEach(function (d, i) {
+        var dep = ((r.times[i] && r.times[i][0]) || "").trim();
+        var arr = ((r.times[i] && r.times[i][1]) || "").trim();
+        var tr = el("tr");
+        if (i === t) tr.className = "today";
+        tr.appendChild(el("td", null, d));
+        if (!dep && !arr) {
+          tr.classList.add("none");
+          tr.appendChild(el("td", { "class": "nf" }, "No flight"));
+          tr.appendChild(el("td", { "class": "nf" }, "—"));
+        } else {
+          tr.appendChild(el("td", null, dep || "—"));
+          tr.appendChild(el("td", null, arr || "—"));
+        }
+        tb.appendChild(tr);
+      });
+      table.appendChild(tb); sec.appendChild(table); wrap.appendChild(sec);
+    });
+  }
+
+  function textField(labelText, value, onInput, tip) {
+    var frag = document.createDocumentFragment();
+    var id = "f" + Math.random().toString(36).slice(2, 8);
+    frag.appendChild(el("label", { "for": id }, labelText));
+    var inp = el("input", { type: "text", id: id });
+    inp.value = value;
+    inp.addEventListener("input", function () { onInput(inp.value); update(); });
+    frag.appendChild(inp);
+    if (tip) frag.appendChild(el("p", { "class": "tip" }, tip));
+    return frag;
+  }
+  function validTime(v) { return v === "" || /^([01]?\d|2[0-3]):[0-5]\d$/.test(v.trim()); }
+
+  function renderEditor() {
+    var body = document.getElementById("editorBody");
+    body.innerHTML = "";
+
+    var sb = el("div", { "class": "savebox" });
+    sb.appendChild(el("p", null, "Change the times below, then click “Publish to TV”. The TV shows the new schedule within about 5 minutes."));
+    body.appendChild(sb);
+
+    var gen = el("fieldset");
+    gen.appendChild(el("legend", null, "Screen text"));
+    gen.appendChild(textField("Page title", state.title, function (v) { state.title = v; }));
+    gen.appendChild(textField("Message heading", state.headline, function (v) { state.headline = v; }));
+    gen.appendChild(textField("Message", state.message, function (v) { state.message = v; }, "Shown in the bar at the bottom of the screen. Leave blank to hide."));
+    body.appendChild(gen);
+
+    state.routes.forEach(function (r, ri) {
+      var fs = el("fieldset");
+      fs.appendChild(el("legend", null, r.name || ("Route " + (ri + 1))));
+      fs.appendChild(textField("Route name", r.name, function (v) { r.name = v; fs.querySelector("legend").textContent = v || ("Route " + (ri + 1)); }));
+      fs.appendChild(textField("Route code", r.code, function (v) { r.code = v; }, "For example LRE > TSV"));
+      fs.appendChild(textField("Arrival column heading", r.arrLabel, function (v) { r.arrLabel = v; }));
+      var tbl = el("table", { "class": "times" }), h = el("tr");
+      h.appendChild(el("th", null, "Day")); h.appendChild(el("th", null, "Departs")); h.appendChild(el("th", null, "Arrives"));
+      tbl.appendChild(h);
+      DAYS.forEach(function (d, i) {
+        var tr = el("tr");
+        tr.appendChild(el("td", null, d));
+        [0, 1].forEach(function (c) {
+          var td = el("td");
+          var inp = el("input", { type: "text", inputmode: "numeric", placeholder: "--:--", "aria-label": d + (c ? " arrives" : " departs") });
+          inp.value = (r.times[i] && r.times[i][c]) || "";
+          inp.addEventListener("input", function () {
+            if (!r.times[i]) r.times[i] = ["", ""];
+            r.times[i][c] = inp.value.trim();
+            inp.classList.toggle("bad", !validTime(inp.value));
+            update();
+          });
+          td.appendChild(inp); tr.appendChild(td);
+        });
+        tbl.appendChild(tr);
+      });
+      fs.appendChild(tbl);
+      fs.appendChild(el("p", { "class": "tip" }, "Type times as 24-hour, like 14:45. Leave both boxes blank on days with no flight."));
+      var acts = el("div", { "class": "row-actions" });
+      var del = el("button", { type: "button", "class": "danger" }, "Remove this route");
+      del.addEventListener("click", function () {
+        if (!confirm("Remove “" + (r.name || "this route") + "” from the screen?")) return;
+        state.routes.splice(ri, 1); update(); renderEditor();
+      });
+      acts.appendChild(del); fs.appendChild(acts);
+      body.appendChild(fs);
+    });
+
+    var foot = el("div", { "class": "editor-foot" });
+    var add = el("button", { type: "button" }, "+ Add another route");
+    add.addEventListener("click", function () {
+      state.routes.push({ name: "Longreach to …", code: "LRE > ", depLabel: "Departs Longreach", arrLabel: "Arrives …", times: DAYS.map(function () { return ["", ""]; }) });
+      update(); renderEditor(); body.scrollTop = body.scrollHeight;
+    });
+    var reset = el("button", { type: "button", "class": "danger" }, "Undo unsaved changes");
+    reset.addEventListener("click", function () {
+      if (!confirm("Go back to the schedule stored in this file? Changes not saved to the file will be lost.")) return;
+      state = clone(FILE_DATA); saveLocal(); renderBoard(); renderEditor();
+    });
+    foot.appendChild(add); foot.appendChild(reset);
+    body.appendChild(foot);
+
+    var cfg = loadCfg();
+    var set = el("fieldset");
+    set.style.marginTop = "28px";
+    set.appendChild(el("legend", null, "Publishing setup (admin only)"));
+    set.appendChild(el("p", { "class": "tip" }, "Done once per computer. Staff don’t need to change anything here."));
+    set.appendChild(textField("GitHub username", cfg.owner, function (v) { cfg.owner = v.trim(); saveCfg(cfg); }));
+    set.appendChild(textField("Repository name", cfg.repo, function (v) { cfg.repo = v.trim(); saveCfg(cfg); }));
+    var tid = "tok" + Math.random().toString(36).slice(2, 6);
+    set.appendChild(el("label", { "for": tid }, "Access token"));
+    var tok = el("input", { type: "password", id: tid, autocomplete: "off", placeholder: cfg.token ? "Saved (hidden)" : "Paste token here" });
+    tok.addEventListener("change", function () { if (tok.value.trim()) { cfg.token = tok.value.trim(); saveCfg(cfg); tok.value = ""; tok.placeholder = "Saved (hidden)"; toast("Token saved on this computer."); } });
+    tok.style.width = "100%"; tok.style.font = "inherit"; tok.style.fontSize = "16px"; tok.style.padding = "9px 10px";
+    tok.style.borderRadius = "6px"; tok.style.border = "1px solid var(--rule)"; tok.style.background = "var(--field)"; tok.style.color = "var(--ink)";
+    set.appendChild(tok);
+    set.appendChild(el("p", { "class": "tip" }, "The token is stored only in this browser on this computer."));
+    var sacts = el("div", { "class": "row-actions" });
+    var test = el("button", { type: "button" }, "Test connection");
+    test.addEventListener("click", function () {
+      ghGet(loadCfg()).then(function () { toast("Connected. Publishing is ready."); })
+        .catch(function (e) { toast(e.message); });
+    });
+    var clr = el("button", { type: "button", "class": "danger" }, "Remove token");
+    clr.addEventListener("click", function () { var c = loadCfg(); c.token = ""; saveCfg(c); renderEditor(); toast("Token removed from this computer."); });
+    var bk = el("button", { type: "button" }, "Save backup file");
+    bk.addEventListener("click", saveFile);
+    sacts.appendChild(test); sacts.appendChild(clr); sacts.appendChild(bk);
+    set.appendChild(sacts);
+    body.appendChild(set);
+  }
+
+  /* ---------- Publishing to GitHub ---------- */
+  var CFG_KEY = "lre-flight-board-publish";
+  function loadCfg() {
+    var d = { owner: "JHU-QAL", repo: "lre-flights", token: "" };
+    try { var raw = localStorage.getItem(CFG_KEY); if (raw) { var c = JSON.parse(raw); for (var k in c) d[k] = c[k]; } } catch (e) {}
+    return d;
+  }
+  function saveCfg(c) { try { localStorage.setItem(CFG_KEY, JSON.stringify(c)); } catch (e) {} }
+  function apiUrl(c) { return "https://api.github.com/repos/" + encodeURIComponent(c.owner) + "/" + encodeURIComponent(c.repo) + "/contents/index.html"; }
+  function ghHeaders(c) { return { "Authorization": "Bearer " + c.token, "Accept": "application/vnd.github+json" }; }
+  function ghGet(c) {
+    if (!c.token) return Promise.reject(new Error("This computer isn’t set up to publish yet. Ask your admin."));
+    return fetch(apiUrl(c), { headers: ghHeaders(c), cache: "no-store" }).then(function (r) {
+      if (r.status === 401) throw new Error("The access token isn’t valid or has expired. Ask your admin.");
+      if (r.status === 403 || r.status === 404) throw new Error("Can’t reach the board on GitHub. Ask your admin to check the setup.");
+      if (!r.ok) throw new Error("GitHub error (" + r.status + "). Please try again.");
+      return r.json();
+    }, function () { throw new Error("No internet connection. Please try again."); });
+  }
+  function b64(str) {
+    var bytes = new TextEncoder().encode(str), bin = "";
+    for (var i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+    return btoa(bin);
+  }
+  var publishing = false;
+  function publish() {
+    if (publishing) return;
+    var bad = editor.querySelectorAll("input.bad");
+    if (bad.length) { toast("Please fix the times marked in red first."); bad[0].focus(); return; }
+    var c = loadCfg(), btn = document.getElementById("publishBtn");
+    publishing = true; btn.textContent = "Publishing…"; btn.disabled = true;
+    ghGet(c).then(function (cur) {
+      return fetch(apiUrl(c), {
+        method: "PUT",
+        headers: ghHeaders(c),
+        body: JSON.stringify({ message: "Update flight schedule", content: b64(buildHtml()), sha: cur.sha })
+      }).then(function (r) {
+        if (!r.ok) throw new Error("Couldn’t publish (" + r.status + "). Please try again.");
+      });
+    }).then(function () {
+      FILE_DATA = clone(state);
+      toast("Published. The TV will update within about 5 minutes.");
+    }).catch(function (e) {
+      toast(e.message);
+    }).then(function () {
+      publishing = false; btn.textContent = "Publish to TV"; btn.disabled = false;
+    });
+  }
+
+  function update() { state.updated = Date.now(); saveLocal(); renderBoard(); }
+
+  // Build a copy of this file with the current schedule written inside it.
+  function buildHtml() {
+    var json = JSON.stringify(state).replace(/</g, "\\u003c");
+    var re = /(<script id="board-data" type="application\/json">)[\s\S]*?(<\/script>)/;
+    return PRISTINE.replace(re, function (m, a, b) { return a + "\n" + json + "\n" + b; });
+  }
+  function toast(msg) {
+    var t = document.getElementById("toast");
+    t.textContent = msg; t.classList.add("show");
+    clearTimeout(toast._t); toast._t = setTimeout(function () { t.classList.remove("show"); }, 6000);
+  }
+  function saveFile() {
+    var html = buildHtml();
+    if (window.showSaveFilePicker) {
+      window.showSaveFilePicker({
+        suggestedName: "index.html",
+        types: [{ description: "Web page", accept: { "text/html": [".html"] } }]
+      }).then(function (handle) {
+        return handle.createWritable().then(function (w) {
+          return w.write(html).then(function () { return w.close(); });
+        });
+      }).then(function () {
+        FILE_DATA = clone(state);
+        toast("Backup saved.");
+      }).catch(function (e) {
+        if (e && e.name === "AbortError") return;
+        downloadFallback(html);
+      });
+    } else {
+      downloadFallback(html);
+    }
+  }
+  function downloadFallback(html) {
+    try {
+      var blob = new Blob([html], { type: "text/html" });
+      var a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "index.html";
+      document.body.appendChild(a); a.click();
+      setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+      FILE_DATA = clone(state);
+      toast("Saved to your Downloads folder as index.html.");
+    } catch (e) {
+      toast("Couldn’t save the file on this device.");
+    }
+  }
+
+  var editor = document.getElementById("editor");
+  function openEditor(on) {
+    editor.classList.toggle("open", on);
+    editor.setAttribute("aria-hidden", on ? "false" : "true");
+    if (on) { renderEditor(); setTimeout(function () { var f = editor.querySelector("input"); if (f) f.focus(); }, 50); }
+    showControls();
+  }
+  document.getElementById("editBtn").addEventListener("click", function () { openEditor(!editor.classList.contains("open")); });
+  document.getElementById("doneBtn").addEventListener("click", function () { openEditor(false); });
+  document.getElementById("publishBtn").addEventListener("click", publish);
+  document.getElementById("themeBtn").addEventListener("click", function () {
+    var isDark = state.theme ? state.theme === "dark" : window.matchMedia("(prefers-color-scheme: dark)").matches;
+    state.theme = isDark ? "light" : "dark"; update();
+  });
+  function toggleFs() {
+    try { if (!document.fullscreenElement) document.documentElement.requestFullscreen(); else document.exitFullscreen(); } catch (e) {}
+  }
+  document.getElementById("fsBtn").addEventListener("click", toggleFs);
+  document.addEventListener("keydown", function (e) {
+    if (e.target.tagName === "INPUT") { if (e.key === "Escape") openEditor(false); return; }
+    if (e.key === "e" || e.key === "E") openEditor(!editor.classList.contains("open"));
+    if (e.key === "f" || e.key === "F") toggleFs();
+    if (e.key === "Escape") openEditor(false);
+  });
+
+  var controls = document.getElementById("controls"), idleTimer;
+  function showControls() {
+    controls.classList.remove("hidden");
+    document.body.style.cursor = "";
+    clearTimeout(idleTimer);
+    if (!editor.classList.contains("open")) {
+      idleTimer = setTimeout(function () { controls.classList.add("hidden"); document.body.style.cursor = "none"; }, 3000);
+    }
+  }
+  ["mousemove", "mousedown", "touchstart", "keydown"].forEach(function (ev) {
+    document.addEventListener(ev, showControls, { passive: true });
+  });
+
+  var timeEl = document.getElementById("time"), dateEl = document.getElementById("date"), lastDay = "";
+  function tick() {
+    var now = new Date();
+    timeEl.textContent = now.toLocaleTimeString("en-AU", { hour: "2-digit", minute: "2-digit", hour12: false });
+    var d = now.toLocaleDateString("en-AU", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+    dateEl.textContent = d;
+    if (d !== lastDay) { lastDay = d; renderBoard(); }
+  }
+
+  // When hosted online, check for a newer schedule every 2 minutes.
+  // If the internet is down, the board keeps showing what it has.
+  function checkForUpdate() {
+    if (!/^https?:/.test(location.protocol)) return;
+    if (editor.classList.contains("open")) return;
+    fetch(location.pathname + "?v=" + Date.now(), { cache: "no-store" })
+      .then(function (r) { return r.ok ? r.text() : null; })
+      .then(function (txt) {
+        if (!txt) return;
+        var m = txt.match(/<script id="board-data" type="application\/json">([\s\S]*?)<\/script>/);
+        if (!m) return;
+        var data = JSON.parse(m[1]);
+        if (data && Array.isArray(data.routes) && (data.updated || 0) > (state.updated || 0)) {
+          state = data; FILE_DATA = clone(data); saveLocal(); renderBoard();
+        }
+      })
+      .catch(function () {});
+  }
+  setInterval(checkForUpdate, 2 * 60 * 1000);
+  setTimeout(checkForUpdate, 5000);
+
+  renderBoard();
+  tick();
+  setInterval(tick, 1000);
+  showControls();
+})();
+</script>
+</body>
+</html>
